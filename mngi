@@ -30,34 +30,63 @@ function die()
   exit 1
 }
 
-[[ -n "$SKIP"    ]] || SKIP=0
-[[ -n "$LIMIT"   ]] || LIMIT=10
-[[ -n "$DB_USER" ]] || DB_USER='dev'
-[[ -n "$DB_HOST" ]] || DB_HOST='localhost'
-[[ -n "$DB_PASS" ]] || DB_PASS='dev'
-[[ -n "$DB_NAME" ]] || DB_NAME='test'
-[[ -n "$DB_PORT" ]] || DB_PORT='27017'
-[[ -n "$DB_AUTH" ]] || DB_AUTH='admin'
-[[ -n "$DB_CONF" ]] || DB_CONF='.mng'
-[[ -e "$DB_CONF" ]] && source "$DB_CONF"
-[[ -n "$COL"     ]] || COL="$1"
-[[ -z "$COL"     ]] && die "EMPTY COL"
-[[ -n "$JSON"    ]] || JSON="${COL//.json/}.json"
-[[ -z "$2"       ]] || JSON="$2"
-[[ -s "$JSON"    ]] || die "EMPTY OR NOT FOUND FILE $JSON"
+function jsonArray()
+{
+
+TMP="$(mktemp)"
+JSON_ARRAY=0
+
+head -1 "$JSON"   > "$TMP"
+
+if grep -qE '^\['   "$TMP"
+then
+
+  tail -1 "$JSON" > "$TMP"
+
+  if grep -qE '\]$' "$TMP"
+  then
+    JSON_ARRAY=1
+  fi
+
+fi
+
+rm -f "$TMP" 2>/dev/null
+
+}
+
+[[ -n "$SKIP"       ]] || SKIP=0
+[[ -n "$LIMIT"      ]] || LIMIT=10
+[[ -n "$DB_USER"    ]] || DB_USER='dev'
+[[ -n "$DB_HOST"    ]] || DB_HOST='localhost'
+[[ -n "$DB_PASS"    ]] || DB_PASS='dev'
+[[ -n "$DB_NAME"    ]] || DB_NAME='test'
+[[ -n "$DB_PORT"    ]] || DB_PORT='27017'
+[[ -n "$DB_AUTH"    ]] || DB_AUTH='admin'
+[[ -n "$DB_CONF"    ]] || DB_CONF='.mng'
+[[ -e "$DB_CONF"    ]] && source "$DB_CONF"
+[[ -n "$COL"        ]] || COL="$1"
+[[ -z "$COL"        ]] && die "EMPTY COL"
+[[ -n "$JSON"       ]] || JSON="${COL//.json/}.json"
+[[ -z "$2"          ]] || JSON="$2"
+[[ -s "$JSON"       ]] || die "EMPTY OR NOT FOUND FILE $JSON"
+
+[[ -n "$JSON_ARRAY" ]] || jsonArray
 
 if ! command -v mongoimport >/dev/null 2>/dev/null
 then
   die "NOT FOUND mongoimport"
 fi
 
-mongoimport                            \
-  --port                   "$DB_PORT"  \
-  --host                   "$DB_HOST"  \
-  --username               "$DB_USER"  \
-  --password               "$DB_PASS"  \
-  --db                     "$DB_NAME"  \
-  --authenticationDatabase="$DB_AUTH"  \
-  --collection             "$COL"      \
-  --file                   "$JSON"     \
-  --jsonArray
+MONGO_IMPORT='mongoimport'
+MONGO_IMPORT+=" --port $DB_PORT"
+MONGO_IMPORT+=" --host $DB_HOST"
+MONGO_IMPORT+=" --username $DB_USER"
+MONGO_IMPORT+=" --password $DB_PASS"
+MONGO_IMPORT+=" --db $DB_NAME"
+MONGO_IMPORT+=" --authenticationDatabase=$DB_AUTH"
+MONGO_IMPORT+=" --collection $COL"
+MONGO_IMPORT+=" --file $JSON"
+
+[[ "$JSON_ARRAY" -eq 1 ]] && MONGO_IMPORT+=' --jsonArray'
+
+bash -c "$MONGO_IMPORT" || die "FAILED IMPORT IN $COL FROM $JSON"
