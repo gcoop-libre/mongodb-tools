@@ -1,0 +1,186 @@
+#!/bin/bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2024 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2024 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# shellcheck disable=SC1090
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+BIN="$(basename "$0")"
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+function temporal()
+{
+  TMPI="$(mktemp)"
+  TMPO="$(mktemp)"
+  true > "$TMPI"
+  true > "$TMPO"
+}
+
+function clean()
+{
+  rm -f "$TMPI" "$TMPO"
+}
+
+function read_piped_input()
+{
+  while IFS= read -r PIPED_INPUT
+  do
+    echo "$PIPED_INPUT" >> "$TMPI"
+  done
+}
+
+function defaults()
+{
+  [[ -n "$DB_NAME"  ]] || DB_NAME='test'
+  [[ -n "$DB_HOST"  ]] || DB_HOST='localhost'
+  [[ -n "$DB_PORT"  ]] || DB_PORT='27017'
+  [[ -n "$DB_USER"  ]] || DB_USER=''
+  [[ -n "$DB_PASS"  ]] || DB_PASS=''
+  [[ -n "$TO_JSON"  ]] || TO_JSON=0
+  [[ -n "$TWO_COLS" ]] || TWO_COLS=0
+  [[ -n "$QUIET"    ]] || QUIET=0
+  [[ -n "$CAT"      ]] || CAT="/usr/bin/cat $TMPI"
+  [[ -n "$VIM"      ]] && CAT="bat --style=plain,changes -l js $TMPI"
+  [[ -n "$MDC"      ]] || MDC='~~~'
+  [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
+}
+
+function params()
+{
+  if [[ -z "$1" ]]
+  then
+    if [[ -t 0 ]]
+    then
+      :
+    else
+      read_piped_input
+    fi
+  else
+    if [[ -s "$1" ]]
+    then
+      cp -f "$1" "$TMPI" >/dev/null
+    else
+      echo "$*" > "$TMPI"
+    fi
+  fi
+
+  [[ -s "$TMPI"     ]] || echo 'show collections' > "$TMPI"
+  [[ -s "$TMPI"     ]] || die "EMPTY INPUT"
+
+}
+
+cfg_load ()
+{
+  local CFG
+
+  CFG=".${BIN}"
+
+  [[ -s "$CFG" ]] || return
+
+  while read -r LINE
+  do
+
+    [[ "$LINE"   =~ DB_PASS.* ]] && continue
+    [[ "$QUIET" -eq 0         ]] && stderror "READ $CFG SET $LINE"
+
+  done < "$CFG"
+
+  source "$CFG"
+}
+
+function code()
+{
+  printf "%s\\n\\n"    "$MDQ"
+  bash -c "$CAT"
+  printf "\\n%s\\n\\n" "$MDC"
+}
+
+function add_db_name()
+{
+  sed -i "1i use $DB_NAME" "$TMPI"
+}
+
+function query_time()
+{
+  if command -v sec2hms >/dev/null 2>/dev/null
+  then
+    stderror "$(sec2hms "$E_SEC")"
+  else
+    stderror "$E_SEC seconds"
+  fi
+}
+
+function query()
+{
+
+  add_db_name
+
+  CMD='mongosh'
+  CMD+=' --quiet'
+  CMD+=' --norc'
+  CMD+=' --shell'
+  [[ "$TO_JSON" -eq 1 ]] && CMD+=' --json'
+  CMD+=" --port $DB_PORT"
+  CMD+=" --host $DB_HOST"
+  [[ -z "$DB_USER" ]] || CMD+=" --username $DB_USER"
+  [[ -z "$DB_PASS" ]] || CMD+=" --password $DB_PASS"
+
+  E_BEG="$(LC_ALL=c date +%s)"
+
+  bash -c "$CMD < $TMPI > $TMPO" || die "FAIL MONGO QUERY"
+
+  E_END="$(LC_ALL=c date +%s)"
+  E_SEC="$((E_END - E_BEG))"
+
+  [[ -n "$VIM" ]] && code
+
+  SED="s/^$DB_NAME> //g;"
+  SED+="s/^$DB_NAME$//g;"
+  SED+="s/\.\.\.\ //g"
+
+  sed "$SED" "$TMPO"                                    \
+    | grep -vE "(already|switched) (on|to) db $DB_NAME" \
+    | grep -vE '^$'
+
+  stderror ""
+
+  [[ "$QUIET" -eq 0 ]] && query_time
+}
+
+function main()
+{
+  temporal
+  defaults
+  params "$@"
+  cfg_load
+  query
+  clean
+}
+
+main "$@"
