@@ -99,7 +99,7 @@ cfg_load ()
 {
   local CFG
 
-  CFG=".${BIN}"
+  CFG='.mng'
 
   [[ -s "$CFG" ]] || return
 
