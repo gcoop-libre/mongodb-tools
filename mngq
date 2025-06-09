@@ -98,9 +98,6 @@ function params()
 
 cfg_load ()
 {
-  local CFG
-
-  CFG='.mng'
 
   [[ -s "$CFG" ]] || return
 
