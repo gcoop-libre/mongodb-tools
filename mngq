@@ -98,18 +98,17 @@ function params()
 
 cfg_load ()
 {
-
-  [[ -s "$CFG" ]] || return
+  [[ -s "$DB_CONF" ]] || return
 
   while read -r LINE
   do
 
     [[ "$LINE"   =~ DB_PASS.* ]] && continue
-    [[ "$QUIET" -eq 0         ]] && stderror "READ $CFG SET $LINE"
+    [[ "$QUIET" -eq 0         ]] && stderror "READ $DB_CONF SET $LINE"
 
-  done < "$CFG"
+  done < "$DB_CONF"
 
-  source "$CFG"
+  source "$DB_CONF"
 }
 
 function code()
