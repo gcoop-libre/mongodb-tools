@@ -57,6 +57,7 @@ function read_piped_input()
 
 function defaults()
 {
+  [[ -n "$DB_CONF"  ]] || DB_CONF='.mng'
   [[ -n "$DB_NAME"  ]] || DB_NAME='test'
   [[ -n "$DB_HOST"  ]] || DB_HOST='localhost'
   [[ -n "$DB_PORT"  ]] || DB_PORT='27017'
