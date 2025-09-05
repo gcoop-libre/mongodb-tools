@@ -87,6 +87,7 @@ MONGO_IMPORT+=" --username $DB_USER"
 MONGO_IMPORT+=" --password $DB_PASS"
 MONGO_IMPORT+=" --db $DB_NAME"
 MONGO_IMPORT+=" --authenticationDatabase='$DB_AUTH'"
+MONGO_IMPORT+=" --authenticationMechanism=$DB_MECH"
 MONGO_IMPORT+=" --collection $COL"
 MONGO_IMPORT+=" --file $JSON"
 
