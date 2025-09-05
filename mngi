@@ -19,6 +19,8 @@
 
 # shellcheck disable=SC1090
 
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
 function stderror()
 {
   echo >&2 "$1"
