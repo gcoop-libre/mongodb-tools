@@ -58,12 +58,12 @@ rm -f "$TMP" 2>/dev/null
 
 [[ -n "$SKIP"       ]] || SKIP=0
 [[ -n "$LIMIT"      ]] || LIMIT=10
-[[ -n "$DB_USER"    ]] || DB_USER='dev'
-[[ -n "$DB_HOST"    ]] || DB_HOST='localhost'
-[[ -n "$DB_PASS"    ]] || DB_PASS='dev'
-[[ -n "$DB_NAME"    ]] || DB_NAME='test'
-[[ -n "$DB_PORT"    ]] || DB_PORT='27017'
 [[ -n "$DB_AUTH"    ]] || DB_AUTH='admin'
+[[ -n "$DB_HOST"    ]] || DB_HOST='localhost'
+[[ -n "$DB_NAME"    ]] || DB_NAME='test'
+[[ -n "$DB_PASS"    ]] || DB_PASS='dev'
+[[ -n "$DB_PORT"    ]] || DB_PORT='27017'
+[[ -n "$DB_USER"    ]] || DB_USER='dev'
 [[ -n "$DB_CONF"    ]] || DB_CONF='.mng'
 [[ -e "$DB_CONF"    ]] && source "$DB_CONF"
 [[ -n "$COL"        ]] || COL="$1"
