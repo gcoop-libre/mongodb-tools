@@ -146,11 +146,6 @@ function code()
   printf "\\n%s\\n\\n" "$MDC"
 }
 
-function add_db_name()
-{
-  sed -i "1i use $DB_NAME" "$TMPI"
-}
-
 function query_time()
 {
   if command -v sec2hms >/dev/null 2>/dev/null
@@ -163,8 +158,6 @@ function query_time()
 
 function query()
 {
-
-  add_db_name
 
   CMD='mongosh'
   CMD+=' --quiet'
