@@ -168,8 +168,10 @@ function query()
   CMD+=" --authenticationMechanism=$DB_MECH"
   CMD+=" $DB_URI"
 
-  E_BEG="$(LC_ALL=c date +%s)"
+  CMD_DEBUG="$(hide_credentials "$CMD")"
+  [[ "$DEBUG_CMD" -eq 1 ]] && stderror "$CMD_DEBUG"
 
+  E_BEG="$(LC_ALL=c date +%s)"
   bash -c "$CMD < $TMPI > $TMPO" || die "FAIL MONGO QUERY"
 
   E_END="$(LC_ALL=c date +%s)"
