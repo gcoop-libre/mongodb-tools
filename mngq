@@ -169,6 +169,7 @@ function query()
   [[ -z "$DB_USER" ]] || CMD+=" --username $DB_USER"
   [[ -z "$DB_PASS" ]] || CMD+=" --password $DB_PASS"
   CMD+=" --authenticationDatabase='$DB_AUTH'"
+  CMD+=" --authenticationMechanism=$DB_MECH"
 
   E_BEG="$(LC_ALL=c date +%s)"
 
