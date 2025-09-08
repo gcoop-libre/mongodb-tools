@@ -132,6 +132,9 @@ cfg_load ()
       fi
     fi
   fi
+
+  DB_URL="$(hide_credentials "$DB_URI")"
+
 }
 
 function code()
