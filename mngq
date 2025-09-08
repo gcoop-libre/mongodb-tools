@@ -118,6 +118,20 @@ cfg_load ()
 
   done < "$DB_CONF"
 
+  if [[ -z "$DB_URI" ]]
+  then
+    if [[ -z "$DB_USER" ]]
+    then
+      DB_URI="mongodb://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    else
+      if [[ -z "$DB_PASS" ]]
+      then
+        DB_URI="mongodb://${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      else
+        DB_URI="mongodb://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      fi
+    fi
+  fi
 }
 
 function code()
