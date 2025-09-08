@@ -98,6 +98,11 @@ function params()
 
 }
 
+function hide_credentials()
+{
+  echo "${1//$DB_USER:$DB_PASS@/$DB_USER:********@}"
+}
+
 cfg_load ()
 {
   [[ -s "$DB_CONF" ]] || return
