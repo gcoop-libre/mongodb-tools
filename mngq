@@ -44,7 +44,7 @@ function temporal()
 
 function clean()
 {
-  rm -f "$TMPI" "$TMPO"
+  [[ "$BASH_DEBUG" -eq 0 ]] && rm -f "$TMPI" "$TMPO"
 }
 
 function read_piped_input()
