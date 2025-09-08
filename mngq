@@ -110,12 +110,14 @@ cfg_load ()
   while read -r LINE
   do
 
-    [[ "$LINE"   =~ DB_PASS.* ]] && continue
+    [[ "$LINE"   =~ ^\#.*     ]] && continue
+    KEY="${LINE%%=*}"
+    VAL="${LINE##*=}"
+    declare -g "$KEY=$VAL"
     [[ "$QUIET" -eq 0         ]] && stderror "READ $DB_CONF SET $LINE"
 
   done < "$DB_CONF"
 
-  source "$DB_CONF"
 }
 
 function code()
