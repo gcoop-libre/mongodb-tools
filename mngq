@@ -164,7 +164,7 @@ cfg_load ()
   DB_URL="$(hide_credentials "$DB_URI")"
 
   [[ "$QUIET" -eq 0 ]] \
-    && stderror "READ $DB_CONF SET DB_URI=$DB_URL"
+    && stderror "READ $(realpath "$DB_CONF") SET DB_URI=$DB_URL"
 }
 
 function code()
