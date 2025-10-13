@@ -74,6 +74,17 @@ function defaults()
   [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
 }
 
+function requirements()
+{
+  for r in mongosh realpath
+  do
+    if ! cmd "$r"
+    then
+      die "NOT FOUND $r"
+    fi
+  done
+}
+
 function params()
 {
   if [[ -z "$1" ]]
@@ -194,6 +205,7 @@ function query()
 
 function main()
 {
+  requirements
   temporal
   defaults
   params "$@"
