@@ -73,6 +73,16 @@ function defaults()
   [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
 }
 
+function cmd()
+{
+  if command -v "$1" >/dev/null 2>/dev/null
+  then
+    return 0
+  else
+    return 1
+  fi
+}
+
 function requirements()
 {
   for r in mongosh realpath
