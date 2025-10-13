@@ -116,16 +116,24 @@ function hide_credentials()
 
 cfg_load ()
 {
+  local CNF
+
   [[ -s "$DB_CONF" ]] || return
 
   while read -r LINE
   do
 
-    [[ "$LINE"   =~ ^\#.*     ]] && continue
+    [[ "$LINE" =~ ^\#.* ]] && continue
     KEY="${LINE%%=*}"
     VAL="${LINE##*=}"
     declare -g "$KEY=$VAL"
-    [[ "$QUIET" -eq 0         ]] && stderror "READ $DB_CONF SET $LINE"
+
+    [[ "$QUIET" -eq 1 ]] && continue
+
+    CNF="$LINE"
+    [[ "$KEY" = DB_PASS ]] && CNF="DB_PASS=********"
+
+    stderror "READ $(realpath "$DB_CONF") SET $CNF"
 
   done < "$DB_CONF"
 
