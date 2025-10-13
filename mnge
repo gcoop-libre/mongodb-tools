@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2024 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2024 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# shellcheck disable=SC1091
+# shellcheck disable=SC2034
+# shellcheck disable=SC2094
+
+PID="$$"
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+function syslog()
+{
+  local MSG
+
+  MSG="$(echo "$1" | tr '\n' ' ')"
+  [[ "$SYSLOG" -eq 1 ]] && logger -p "user.$SEVERITY" -t "$BIN" "$MSG"
+}
+
+function stderror()
+{
+  SEVERITY='err'
+  syslog "$1"
+  echo >&2 "$1"
+}
+
+function die()
+{
+  [[    "$ERROR" -eq 0 ]] && ERROR=1
+  [[ -s "$LOG_ERR"     ]] && syslog "$(cat "$LOG_ERR")"
+  stderror "$1"
+  exit "$ERROR"
+}
+
+function sec2hms()
+{
+  local HH MM SS SEC
+
+  SEC="$1"
+  HH="$((SEC / 3600))"
+  MM="$(((SEC % 3600) / 60))"
+  SS="$((SEC % 60))"
+
+  printf "%02d:%02d:%02d" "$HH" "$MM" "$SS"
+}
+
+function get_first()
+{
+  head -1 "$JSON" | jq -r "$JQ" 2>/dev/null || echo 'null'
+}
+
+function get_last()
+{
+  tail -1 "$JSON" | jq -r "$JQ" 2>/dev/null || echo 'null'
+}
+
+function show_error()
+{
+  MSG_ERR="$(cat "$LOG_ERR")"
+  MSG_ERR="${MSG_ERR##*$'\t'}"
+  die "FAILED DB_HOST=$DB_HOST DB_PORT=$DB_PORT DB_NAME=$DB_NAME ERROR=$MSG_ERR"
+}
+
+function mongo_export()
+{
+  MSG="START EXPORT $COL FROM $DB_NAME SKIP=$SKIP LIMIT=$LIMIT"
+  stderror "$MSG"
+
+  CMD='mongoexport'
+  CMD+=" --port $DB_PORT"
+  CMD+=" --host $DB_HOST"
+  CMD+=" --username $DB_USER"
+  CMD+=" --password $DB_PASS"
+  CMD+=" --db $DB_NAME"
+  CMD+=" --authenticationDatabase='$DB_AUTH'"
+  CMD+=" --authenticationMechanism=$DB_MECH"
+  CMD+=" --collection $COL"
+  [[ "$TO_JSON" -eq 1 ]] && CMD+=" --jsonArray"
+  CMD+=" --out $JSON"
+  [[ "$SKIP"  -eq 0 ]] || CMD+=" --skip $SKIP"
+  [[ "$LIMIT" -eq 0 ]] || CMD+=" --limit $LIMIT"
+  [[ -z "$QUERY"    ]] || CMD+=" --query '$QUERY'"
+
+  BEGIN="$(date +%s)"
+  if ! bash -c "$CMD 2>$LOG_ERR || exit 1"
+  then
+    show_error
+  fi
+  END="$(date +%s)"
+
+  SEC="$((END - BEGIN))"
+  DURATION="$(sec2hms "$SEC")"
+  DATE_BEGIN="$(date +'%FT%H:%M' -d "@$BEGIN")"
+  DATE_END="$(date   +'%FT%H:%M' -d "@$END")"
+}
+
+function cmd()
+{
+  if command -v "$1" >/dev/null 2>/dev/null
+  then
+    return 0
+  else
+    return 1
+  fi
+}
+
+function num2fmt()
+{
+  if cmd numfmt >/dev/null 2>/dev/null
+  then
+    grouping "$1"
+  else
+    echo "$1"
+  fi
+}
+
+function get_records()
+{
+  wc -l < "$JSON"
+}
+
+function hide_credentials()
+{
+  echo "${1//$DB_USER:$DB_PASS@/$DB_USER:********@}"
+}
+
+function get_md5()
+{
+  md5sum "$JSON"
+}
+
+cfg_load()
+{
+  local CNF
+
+  [[ -s "$DB_CONF" ]] || die "EMPTY OR NOT FOUND FILE $DB_CONF"
+
+  while read -r LINE
+  do
+
+    [[ "$LINE"   =~ ^\#.* ]] && continue
+    KEY="${LINE%%=*}"
+    VAL="${LINE##*=}"
+    declare -g "$KEY=$VAL"
+
+    [[ "$QUIET" -eq 1 ]] && continue
+
+    CNF="$LINE"
+    [[ "$KEY" = DB_PASS ]] && CNF="DB_PASS=********"
+
+    stderror "READ $(realpath "$DB_CONF") SET $CNF"
+
+  done < "$DB_CONF"
+
+  if [[ -z "$DB_URI" ]]
+  then
+    if [[ -z "$DB_USER" ]]
+    then
+      DB_URI="mongodb://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    else
+      if [[ -z "$DB_PASS" ]]
+      then
+        DB_URI="mongodb://${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      else
+        DB_URI="mongodb://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      fi
+    fi
+  fi
+
+  DB_URL="$(hide_credentials "$DB_URI")"
+
+  [[ "$QUIET" -eq 0 ]] \
+    && stderror "READ $DB_CONF SET DB_URI=$DB_URL"
+}
+
+function get_log()
+{
+  local VAL
+
+  if [[ "$SYSLOG" -eq 0 ]]
+  then
+
+    NOW="$(date +'%FT%T')"
+    HOST="$(hostname -f || echo "$HOSTNAME")"
+    PID="[$$]:"
+    printf "%s %s@%s%s " "$NOW" "$USER" "$HOST" "$PID"
+
+  fi
+
+  for KEY in DURATION DATE_BEGIN DATE_END RECORDS SIZE MD5 FIRST LAST ERROR JSON
+  do
+
+    VAL="${!KEY}"
+    [[ -z "$VAL" ]] && VAL='null'
+
+    [[ "$KEY" = 'RECORDS' ]] && VAL="$(num2fmt "$VAL")"
+
+    printf "%s=%s " "${KEY,,}" "${!KEY}"
+
+  done | sed 's/ $//g'
+
+  printf "\\n"
+}
+
+function log()
+{
+  [[ -n "$SEVERITY" ]] || SEVERITY='info'
+  [[ "$ERROR" -ne 0 ]] && SEVERITY='err'
+
+  if [[ "$SYSLOG" -eq 1 ]]
+  then
+    logger -p "user.$SEVERITY" -t "$BIN" "$MSG"
+  else
+    echo "$MSG" | tee -a "$LOG" 2>>"$LOG_ERR" \
+      || die "FAILED TO WRITE $(realpath "$LOG")"
+  fi
+}
+
+function show_info()
+{
+  SIZE="$(get_size)"
+  RECORDS="$(get_records)"
+
+  [[ -n "$DATE_BEGIN" ]] \
+    || DATE_BEGIN="$(stat -c %y "$JSON" | cut -c -16)"
+
+  DATE_BEGIN="${DATE_BEGIN// /T}"
+
+  [[ -n "$DATE_END"   ]] || DATE_END="$DATE_BEGIN"
+
+  MD5="$(get_md5)"
+  MD5="${MD5%% *}"
+  FIRST="$(get_first)"
+  LAST="$(get_last)"
+
+  [[ "$RECORDS" = "$LIMIT" ]] || ERROR=100
+  MSG="$(get_log)"
+  log
+}
+
+function requirements()
+{
+  for r in mongoexport bc jq realpath
+  do
+    if ! cmd "$r"
+    then
+      die "NOT FOUND mongoexport"
+    fi
+  done
+}
+
+function num2zeros()
+{
+  local NUM
+
+  NUM="$1"
+  [[ -n "$LEN" ]] || LEN="${#LIMIT}"
+
+  printf "%0${LEN}d" "$NUM"
+}
+
+function get_size()
+{
+  stat --format=%s "$JSON" | numfmt --to=iec
+}
+
+function grouping()
+{
+  numfmt --grouping "$1"
+}
+
+function defaults()
+{
+  ERROR=0
+  [[ -n "$BIN"       ]] || BIN="$(basename "$0")"
+  [[ -n "$SKIP"      ]] || SKIP=0
+  [[ -n "$LIMIT"     ]] || LIMIT=0
+  [[ -n "$DB_AUTH"   ]] || DB_AUTH='admin'
+  [[ -n "$DB_HOST"   ]] || DB_HOST='localhost'
+  [[ -n "$DB_NAME"   ]] || DB_NAME='test'
+  [[ -n "$DB_PASS"   ]] || DB_PASS='dev'
+  [[ -n "$DB_PORT"   ]] || DB_PORT='27017'
+  [[ -n "$DB_USER"   ]] || DB_USER='dev'
+  [[ -n "$DB_MECH"   ]] || DB_MECH='SCRAM-SHA-1'
+  [[ -n "$DB_CONF"   ]] || DB_CONF='.mnge'
+  [[ -n "$NUM"       ]] || NUM="$(num2zeros "$SKIP")"
+  [[ -n "$LOG"       ]] || LOG="$BIN.log"
+  [[ -n "$LOG_ERR"   ]] || LOG_ERR="$BIN-$PID.error"
+  [[ -n "$JQ"        ]] || JQ='.created[]'
+  [[ -n "$SYSLOG"    ]] || SYSLOG=0
+  [[ -n "$DURATION"  ]] || DURATION='00:00:00'
+  [[ -n "$OVERWRITE" ]] || OVERWRITE=0
+}
+
+function params()
+{
+  [[ -n "$COL"      ]] || COL="$1"
+  [[ -z "$COL"      ]] && die "EMPTY COL"
+  [[ -n "$JSON"     ]] || JSON="$COL-$NUM.json"
+  [[ -s "$LOG_ERR"  ]] && true > "$LOG_ERR"
+  [[ -z "$2"        ]] || QUERY="$2"
+
+  if [[ "$OVERWRITE" -eq 1 ]]
+  then
+    true > "$JSON"      \
+    || die "FAILED OVERWRITE $(realpath "$JSON")"
+  fi
+
+  if [[ -s "$JSON" ]]
+  then
+    stderror "NOTHING TO DO, ALREADY EXISTS OUTPUT FILE $JSON"
+    ERROR=0
+  else
+    mongo_export
+  fi
+}
+
+function main()
+{
+  requirements
+  defaults
+  cfg_load
+  params "$@"
+  show_info
+  exit "$ERROR"
+}
+
+main "$@"
