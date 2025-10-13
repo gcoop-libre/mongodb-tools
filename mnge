@@ -260,7 +260,7 @@ function requirements()
   do
     if ! cmd "$r"
     then
-      die "NOT FOUND mongoexport"
+      die "NOT FOUND $r"
     fi
   done
 }
