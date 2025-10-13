@@ -22,8 +22,6 @@
 
 [[ "$BASH_DEBUG" -eq 1 ]] && set -x
 
-BIN="$(basename "$0")"
-
 function stderror()
 {
   echo >&2 "$1"
