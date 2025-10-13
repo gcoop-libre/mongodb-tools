@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # shellcheck disable=SC1090
+# shellcheck disable=SC2094
 
 [[ "$BASH_DEBUG" -eq 1 ]] && set -x
 
