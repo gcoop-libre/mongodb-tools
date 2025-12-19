@@ -160,11 +160,11 @@ function import()
   fi
 
   MONGO_IMPORT='mongoimport'
-  MONGO_IMPORT+=" --username $DB_USER"
   MONGO_IMPORT+=" --password $DB_PASS"
   MONGO_IMPORT+=" --db $DB_NAME"
   [[ -z "$DB_PORT" ]] || MONGO_IMPORT+=" --port $DB_PORT"
   [[ -z "$DB_HOST" ]] || MONGO_IMPORT+=" --host $DB_HOST"
+  [[ -z "$DB_USER" ]] || MONGO_IMPORT+=" --username $DB_USER"
   MONGO_IMPORT+=" --authenticationDatabase='$DB_AUTH'"
   MONGO_IMPORT+=" --authenticationMechanism=$DB_MECH"
   MONGO_IMPORT+=" --collection $COL"
