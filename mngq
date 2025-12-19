@@ -73,6 +73,7 @@ function defaults()
   [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
   [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
   [[ -s "$DECRYPT_CMD" ]] || die "EMPTY OR NOT FOUND DECRYPT COMMAND $DECRYPT_CMD"
+  [[ -n "$ENCRYPT_RGX" ]] || ENCRYPT_RGX='gAAAAAB[a-zA-Z0-9+_/=\-]+'
 }
 
 function cmd()
