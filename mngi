@@ -65,7 +65,7 @@ function defaults()
   [[ -n "$DB_HOST"     ]] || DB_HOST='localhost'
   [[ -n "$DB_MECH"     ]] || DB_MECH='SCRAM-SHA-1'
   [[ -n "$DB_NAME"     ]] || DB_NAME='test'
-  [[ -n "$DB_PASS"     ]] || DB_PASS='dev'
+  [[ -n "$DB_PASS"     ]] || DB_PASS=''
   [[ -n "$DB_PORT"     ]] || DB_PORT='27017'
   [[ -n "$DB_USER"     ]] || DB_USER='dev'
   [[ -n "$DB_CONF"     ]] || DB_CONF='.mng'
