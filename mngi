@@ -18,6 +18,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 # shellcheck disable=SC1090
+# shellcheck disable=SC2094
 
 [[ "$BASH_DEBUG" -eq 1 ]] && set -x
 
@@ -56,41 +57,123 @@ rm -f "$TMP" 2>/dev/null
 
 }
 
-[[ -n "$SKIP"       ]] || SKIP=0
-[[ -n "$LIMIT"      ]] || LIMIT=10
-[[ -n "$DB_AUTH"    ]] || DB_AUTH='admin'
-[[ -n "$DB_HOST"    ]] || DB_HOST='localhost'
-[[ -n "$DB_MECH"    ]] || DB_MECH='SCRAM-SHA-1'
-[[ -n "$DB_NAME"    ]] || DB_NAME='test'
-[[ -n "$DB_PASS"    ]] || DB_PASS='dev'
-[[ -n "$DB_PORT"    ]] || DB_PORT='27017'
-[[ -n "$DB_USER"    ]] || DB_USER='dev'
-[[ -n "$DB_CONF"    ]] || DB_CONF='.mng'
-[[ -e "$DB_CONF"    ]] && source "$DB_CONF"
-[[ -n "$COL"        ]] || COL="$1"
-[[ -z "$COL"        ]] && die "EMPTY COL"
-[[ -n "$JSON"       ]] || JSON="${COL//.json/}.json"
-[[ -z "$2"          ]] || JSON="$2"
-[[ -s "$JSON"       ]] || die "EMPTY OR NOT FOUND FILE $JSON"
+function defaults()
+{
+  [[ -n "$SKIP"        ]] || SKIP=0
+  [[ -n "$LIMIT"       ]] || LIMIT=10
+  [[ -n "$DB_AUTH"     ]] || DB_AUTH='admin'
+  [[ -n "$DB_HOST"     ]] || DB_HOST='localhost'
+  [[ -n "$DB_MECH"     ]] || DB_MECH='SCRAM-SHA-1'
+  [[ -n "$DB_NAME"     ]] || DB_NAME='test'
+  [[ -n "$DB_PASS"     ]] || DB_PASS='dev'
+  [[ -n "$DB_PORT"     ]] || DB_PORT='27017'
+  [[ -n "$DB_USER"     ]] || DB_USER='dev'
+  [[ -n "$DB_CONF"     ]] || DB_CONF='.mng'
+  [[ -e "$DB_CONF"     ]] && source "$DB_CONF"
+  [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
+  [[ -s "$DECRYPT_CMD" ]] || die "EMPTY OR NOT FOUND DECRYPT COMMAND $DECRYPT_CMD"
+  [[ -n "$ENCRYPT_RGX" ]] || ENCRYPT_RGX='gAAAAAB[a-zA-Z0-9+_/=\-]+'
+}
 
-[[ -n "$JSON_ARRAY" ]] || jsonArray
+function params()
+{
+  [[ -n "$COL"        ]] || COL="$1"
+  [[ -z "$COL"        ]] && die "EMPTY COL"
+  [[ -n "$JSON"       ]] || JSON="${COL//.json/}.json"
+  [[ -z "$2"          ]] || JSON="$2"
+  [[ -s "$JSON"       ]] || die "EMPTY OR NOT FOUND FILE $JSON"
+  [[ -n "$JSON_ARRAY" ]] || jsonArray
+}
 
-if ! command -v mongoimport >/dev/null 2>/dev/null
-then
-  die "NOT FOUND mongoimport"
-fi
+function hide_credentials()
+{
+  echo "${1//$DB_USER:$DB_PASS@/$DB_USER:********@}"
+}
 
-MONGO_IMPORT='mongoimport'
-MONGO_IMPORT+=" --port $DB_PORT"
-MONGO_IMPORT+=" --host $DB_HOST"
-MONGO_IMPORT+=" --username $DB_USER"
-MONGO_IMPORT+=" --password $DB_PASS"
-MONGO_IMPORT+=" --db $DB_NAME"
-MONGO_IMPORT+=" --authenticationDatabase='$DB_AUTH'"
-MONGO_IMPORT+=" --authenticationMechanism=$DB_MECH"
-MONGO_IMPORT+=" --collection $COL"
-MONGO_IMPORT+=" --file $JSON"
+cfg_load ()
+{
+  local CNF
 
-[[ "$JSON_ARRAY" -eq 1 ]] && MONGO_IMPORT+=' --jsonArray'
+  [[ -s "$DB_CONF" ]] || return
 
-bash -c "$MONGO_IMPORT" || die "FAILED IMPORT IN $COL FROM $JSON"
+  while read -r LINE
+  do
+
+    [[ "$LINE" =~ ^\#.*  ]] && continue
+    [[ "$LINE" =~ ^DB_.* ]] || continue
+
+    KEY="${LINE%%=*}"
+    VAL="${LINE//$KEY=/}"
+    declare -g "$KEY=$VAL"
+
+    [[ "$QUIET" -eq 1 ]] && continue
+
+    CNF="$LINE"
+    if [[ "$KEY" = DB_PASS ]]
+    then
+      CNF="DB_PASS=********"
+      if [[ "$VAL" =~ $ENCRYPT_RGX ]]
+      then
+        CMD="echo -n \"$VAL\" | $DECRYPT_CMD || exit 1"
+        DEC="$(bash -c "$CMD" || die "ERROR DECRYPT $VAL")"
+        [[ -z "$DEC" ]]       && die "EMPTY DB_PASS"
+        declare -g "$KEY=$DEC"
+      fi
+    fi
+
+    stderror "READ $(realpath "$DB_CONF") SET $CNF"
+
+  done < "$DB_CONF"
+
+  if [[ -z "$DB_URI" ]]
+  then
+    if [[ -z "$DB_USER" ]]
+    then
+      DB_URI="mongodb://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    else
+      if [[ -z "$DB_PASS" ]]
+      then
+        DB_URI="mongodb://${DB_USER}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      else
+        DB_URI="mongodb://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+      fi
+    fi
+  fi
+
+  DB_URL="$(hide_credentials "$DB_URI")"
+
+  [[ "$QUIET" -eq 0 ]] \
+    && stderror "READ $(realpath "$DB_CONF") SET DB_URI=$DB_URL"
+}
+
+function import()
+{
+  if ! command -v mongoimport >/dev/null 2>/dev/null
+  then
+    die "NOT FOUND mongoimport"
+  fi
+
+  MONGO_IMPORT='mongoimport'
+  MONGO_IMPORT+=" --port $DB_PORT"
+  MONGO_IMPORT+=" --host $DB_HOST"
+  MONGO_IMPORT+=" --username $DB_USER"
+  MONGO_IMPORT+=" --password $DB_PASS"
+  MONGO_IMPORT+=" --db $DB_NAME"
+  MONGO_IMPORT+=" --authenticationDatabase='$DB_AUTH'"
+  MONGO_IMPORT+=" --authenticationMechanism=$DB_MECH"
+  MONGO_IMPORT+=" --collection $COL"
+  MONGO_IMPORT+=" --file $JSON"
+
+  [[ "$JSON_ARRAY" -eq 1 ]] && MONGO_IMPORT+=' --jsonArray'
+  bash -c "$MONGO_IMPORT" || die "FAILED IMPORT IN $COL FROM $JSON"
+}
+
+function main()
+{
+  defaults
+  params "$@"
+  cfg_load
+  import
+}
+
+main "$@"
