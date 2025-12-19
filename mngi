@@ -57,6 +57,12 @@ rm -f "$TMP" 2>/dev/null
 
 }
 
+function cfg_import()
+{
+  [[ -s .mng  ]] && DB_CONF='.mng'
+  [[ -s .mngi ]] && DB_CONF='.mngi'
+}
+
 function defaults()
 {
   [[ -n "$SKIP"        ]] || SKIP=0
