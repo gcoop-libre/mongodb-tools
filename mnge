@@ -83,11 +83,11 @@ function mongo_export()
   stderror "$MSG"
 
   CMD='mongoexport'
-  CMD+=" --port $DB_PORT"
-  CMD+=" --host $DB_HOST"
-  CMD+=" --username $DB_USER"
-  CMD+=" --password $DB_PASS"
-  CMD+=" --db $DB_NAME"
+  [[ -n "$DB_PORT" ]] && CMD+=" --port $DB_PORT"
+  [[ -n "$DB_HOST" ]] && CMD+=" --host $DB_HOST"
+  [[ -n "$DB_USER" ]] && CMD+=" --username $DB_USER"
+  [[ -n "$DB_PASS" ]] && CMD+=" --password $DB_PASS"
+  [[ -n "$DB_NAME" ]] && CMD+=" --db $DB_NAME"
   CMD+=" --authenticationDatabase='$DB_AUTH'"
   CMD+=" --authenticationMechanism=$DB_MECH"
   CMD+=" --collection $COL"
@@ -154,15 +154,27 @@ cfg_load()
   while read -r LINE
   do
 
-    [[ "$LINE"   =~ ^\#.* ]] && continue
+    [[ "$LINE" =~ ^\#.*  ]] && continue
+    [[ "$LINE" =~ ^DB_.* ]] || continue
+
     KEY="${LINE%%=*}"
-    VAL="${LINE##*=}"
+    VAL="${LINE//$KEY=/}"
     declare -g "$KEY=$VAL"
 
     [[ "$QUIET" -eq 1 ]] && continue
 
     CNF="$LINE"
-    [[ "$KEY" = DB_PASS ]] && CNF="DB_PASS=********"
+    if [[ "$KEY" = DB_PASS ]]
+    then
+      CNF="DB_PASS=********"
+      if [[ "$VAL" =~ $ENCRYPT_RGX ]]
+      then
+        CMD="echo -n \"$VAL\" | $DECRYPT_CMD || exit 1"
+        DEC="$(bash -c "$CMD" || die "ERROR DECRYPT $VAL")"
+        [[ -z "$DEC" ]]       && die "EMPTY DB_PASS"
+        declare -g "$KEY=$DEC"
+      fi
+    fi
 
     stderror "READ $(realpath "$DB_CONF") SET $CNF"
 
@@ -285,6 +297,12 @@ function grouping()
   numfmt --grouping "$1"
 }
 
+function cfg_export()
+{
+  [[ -s .mng  ]] && DB_CONF='.mng'
+  [[ -s .mnge ]] && DB_CONF='.mnge'
+}
+
 function defaults()
 {
   ERROR=0
@@ -294,11 +312,11 @@ function defaults()
   [[ -n "$DB_AUTH"   ]] || DB_AUTH='admin'
   [[ -n "$DB_HOST"   ]] || DB_HOST='localhost'
   [[ -n "$DB_NAME"   ]] || DB_NAME='test'
-  [[ -n "$DB_PASS"   ]] || DB_PASS='dev'
+  [[ -n "$DB_PASS"   ]] || DB_PASS=''
   [[ -n "$DB_PORT"   ]] || DB_PORT='27017'
   [[ -n "$DB_USER"   ]] || DB_USER='dev'
   [[ -n "$DB_MECH"   ]] || DB_MECH='SCRAM-SHA-1'
-  [[ -n "$DB_CONF"   ]] || DB_CONF='.mnge'
+  [[ -n "$DB_CONF"   ]] || cfg_export
   [[ -n "$NUM"       ]] || NUM="$(num2zeros "$SKIP")"
   [[ -n "$LOG"       ]] || LOG="$BIN.log"
   [[ -n "$LOG_ERR"   ]] || LOG_ERR="$BIN-$PID.error"
@@ -306,6 +324,9 @@ function defaults()
   [[ -n "$SYSLOG"    ]] || SYSLOG=0
   [[ -n "$DURATION"  ]] || DURATION='00:00:00'
   [[ -n "$OVERWRITE" ]] || OVERWRITE=0
+  [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
+  [[ -s "$DECRYPT_CMD" ]] || die "EMPTY OR NOT FOUND DECRYPT COMMAND $DECRYPT_CMD"
+  [[ -n "$ENCRYPT_RGX" ]] || ENCRYPT_RGX='gAAAAAB[a-zA-Z0-9+_/=\-]+'
 }
 
 function params()
