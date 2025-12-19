@@ -143,7 +143,17 @@ cfg_load ()
     [[ "$QUIET" -eq 1 ]] && continue
 
     CNF="$LINE"
-    [[ "$KEY" = DB_PASS ]] && CNF="DB_PASS=********"
+    if [[ "$KEY" = DB_PASS ]]
+    then
+      CNF="DB_PASS=********"
+      if [[ "$VAL" =~ $ENCRYPT_RGX ]]
+      then
+        CMD="echo -n \"$VAL\" | $DECRYPT_CMD || exit 1"
+        DEC="$(bash -c "$CMD" || die "ERROR DECRYPT $VAL")"
+        [[ -z "$DEC" ]]       && die "EMPTY DB_PASS"
+        declare -g "$KEY=$DEC"
+      fi
+    fi
 
     stderror "READ $(realpath "$DB_CONF") SET $CNF"
 
