@@ -68,7 +68,6 @@ function defaults()
   [[ -n "$DB_PASS"     ]] || DB_PASS=''
   [[ -n "$DB_PORT"     ]] || DB_PORT='27017'
   [[ -n "$DB_USER"     ]] || DB_USER='dev'
-  [[ -n "$DB_CONF"     ]] || DB_CONF='.mng'
   [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
   [[ -s "$DECRYPT_CMD" ]] || die "EMPTY OR NOT FOUND DECRYPT COMMAND $DECRYPT_CMD"
   [[ -n "$ENCRYPT_RGX" ]] || ENCRYPT_RGX='gAAAAAB[a-zA-Z0-9+_/=\-]+'
