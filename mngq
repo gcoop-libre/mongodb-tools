@@ -135,7 +135,9 @@ cfg_load ()
   while read -r LINE
   do
 
-    [[ "$LINE" =~ ^\#.* ]] && continue
+    [[ "$LINE" =~ ^\#.*  ]] && continue
+    [[ "$LINE" =~ ^DB_.* ]] || continue
+
     KEY="${LINE%%=*}"
     VAL="${LINE//$KEY=/}"
     declare -g "$KEY=$VAL"
