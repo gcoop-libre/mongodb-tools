@@ -137,7 +137,7 @@ cfg_load ()
 
     [[ "$LINE" =~ ^\#.* ]] && continue
     KEY="${LINE%%=*}"
-    VAL="${LINE##*=}"
+    VAL="${LINE//$KEY=/}"
     declare -g "$KEY=$VAL"
 
     [[ "$QUIET" -eq 1 ]] && continue
