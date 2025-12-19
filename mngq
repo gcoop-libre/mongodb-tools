@@ -71,6 +71,7 @@ function defaults()
   [[ -n "$VIM"      ]] && CAT="bat --style=plain,changes -l js $TMPI"
   [[ -n "$MDC"      ]] || MDC='~~~'
   [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
+  [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
 }
 
 function cmd()
