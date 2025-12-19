@@ -56,21 +56,21 @@ function read_piped_input()
 
 function defaults()
 {
-  [[ -n "$DB_CONF"  ]] || DB_CONF='.mng'
-  [[ -n "$DB_NAME"  ]] || DB_NAME='test'
-  [[ -n "$DB_AUTH"  ]] || DB_AUTH='admin'
-  [[ -n "$DB_HOST"  ]] || DB_HOST='localhost'
-  [[ -n "$DB_MECH"  ]] || DB_MECH='SCRAM-SHA-1'
-  [[ -n "$DB_PORT"  ]] || DB_PORT='27017'
-  [[ -n "$DB_USER"  ]] || DB_USER=''
-  [[ -n "$DB_PASS"  ]] || DB_PASS=''
-  [[ -n "$TO_JSON"  ]] || TO_JSON=0
-  [[ -n "$TWO_COLS" ]] || TWO_COLS=0
-  [[ -n "$QUIET"    ]] || QUIET=0
-  [[ -n "$CAT"      ]] || CAT="/usr/bin/cat $TMPI"
-  [[ -n "$VIM"      ]] && CAT="bat --style=plain,changes -l js $TMPI"
-  [[ -n "$MDC"      ]] || MDC='~~~'
-  [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
+  [[ -n "$DB_CONF"     ]] || DB_CONF='.mng'
+  [[ -n "$DB_NAME"     ]] || DB_NAME='test'
+  [[ -n "$DB_AUTH"     ]] || DB_AUTH='admin'
+  [[ -n "$DB_HOST"     ]] || DB_HOST='localhost'
+  [[ -n "$DB_MECH"     ]] || DB_MECH='SCRAM-SHA-1'
+  [[ -n "$DB_PORT"     ]] || DB_PORT='27017'
+  [[ -n "$DB_USER"     ]] || DB_USER=''
+  [[ -n "$DB_PASS"     ]] || DB_PASS=''
+  [[ -n "$TO_JSON"     ]] || TO_JSON=0
+  [[ -n "$TWO_COLS"    ]] || TWO_COLS=0
+  [[ -n "$QUIET"       ]] || QUIET=0
+  [[ -n "$CAT"         ]] || CAT="/usr/bin/cat $TMPI"
+  [[ -n "$VIM"         ]] && CAT="bat --style=plain,changes -l js $TMPI"
+  [[ -n "$MDC"         ]] || MDC='~~~'
+  [[ -n "$MDQ"         ]] || MDQ="${MDC}js"
   [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
   [[ -s "$DECRYPT_CMD" ]] || die "EMPTY OR NOT FOUND DECRYPT COMMAND $DECRYPT_CMD"
   [[ -n "$ENCRYPT_RGX" ]] || ENCRYPT_RGX='gAAAAAB[a-zA-Z0-9+_/=\-]+'
