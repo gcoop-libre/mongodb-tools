@@ -75,6 +75,7 @@ function defaults()
   [[ -n "$DB_PORT"     ]] || DB_PORT='27017'
   [[ -n "$DB_USER"     ]] || DB_USER='dev'
   [[ -n "$DB_CONF"     ]] || cfg_import
+  [[ -s "$DB_CONF"     ]] || die "NOT FOUND CONFIG $DB_CONF"
   [[ -n "$DECRYPT_CMD" ]] || DECRYPT_CMD="$(command -v pd 2>/dev/null)"
   [[ -s "$DECRYPT_CMD" ]] || die "EMPTY OR NOT FOUND DECRYPT COMMAND $DECRYPT_CMD"
   [[ -n "$ENCRYPT_RGX" ]] || ENCRYPT_RGX='gAAAAAB[a-zA-Z0-9+_/=\-]+'
