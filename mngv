@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2024 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2024 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# shellcheck disable=SC1090
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+function temporal()
+{
+  TMPI="$(mktemp)"
+  TMPO="$(mktemp)"
+  true > "$TMPI"
+  true > "$TMPO"
+}
+
+function clean()
+{
+  rm -f "$TMPI" "$TMPO"
+}
+
+function read_piped_input()
+{
+  while IFS= read -r PIPED_INPUT
+  do
+    echo "$PIPED_INPUT" >> "$TMPI"
+  done
+}
+
+function defaults()
+{
+  [[ -n "$DB_CONF"  ]] || DB_CONF='.mng'
+  [[ -n "$DB_NAME"  ]] || DB_NAME='test'
+  [[ -n "$DB_HOST"  ]] || DB_HOST='localhost'
+  [[ -n "$DB_PORT"  ]] || DB_PORT='27017'
+  [[ -n "$DB_USER"  ]] || DB_USER=''
+  [[ -n "$DB_PASS"  ]] || DB_PASS=''
+  [[ -n "$TO_JSON"  ]] || TO_JSON=0
+  [[ -n "$TWO_COLS" ]] || TWO_COLS=0
+  [[ -n "$QUIET"    ]] || QUIET=1
+  [[ -n "$CAT"      ]] || CAT="/usr/bin/cat $TMPI"
+  [[ -n "$VIM"      ]] && CAT="bat --style=plain,changes -l js $TMPI"
+  [[ -n "$MDC"      ]] || MDC='~~~'
+  [[ -n "$MDQ"      ]] || MDQ="${MDC}js"
+  [[ -n "$MAX"      ]] || MAX=30
+}
+
+function params()
+{
+  if [[ -z "$1" ]]
+  then
+    if [[ -t 0 ]]
+    then
+      :
+    else
+      read_piped_input
+    fi
+  else
+    if [[ -s "$1" ]]
+    then
+      cp -f "$1" "$TMPI" >/dev/null
+    else
+      echo "$*" > "$TMPI"
+    fi
+  fi
+
+  [[ -s "$TMPI"     ]] || echo 'show collections' > "$TMPI"
+  [[ -s "$TMPI"     ]] || die "EMPTY INPUT"
+
+}
+
+cfg_load ()
+{
+  [[ -s "$DB_CONF" ]] || return
+
+  while read -r LINE
+  do
+
+    [[ "$LINE"   =~ DB_PASS.* ]] && continue
+    [[ "$QUIET" -eq 0         ]] && stderror "READ $DB_CONF SET $LINE"
+
+  done < "$DB_CONF"
+
+  source "$DB_CONF"
+}
+
+function code()
+{
+  printf "%s\\n\\n"    "$MDQ"
+  bash -c "$CAT"
+  printf "\\n%s\\n\\n" "$MDC"
+}
+
+function add_db_name()
+{
+  sed -i "1i use $DB_NAME" "$TMPI"
+}
+
+function server_version_time()
+{
+  if command -v sec2hms >/dev/null 2>/dev/null
+  then
+    stderror "$(sec2hms "$E_SEC")"
+  else
+    stderror "$E_SEC seconds"
+  fi
+}
+
+function server_version()
+{
+  local VERSION
+
+  VERSION="$(mngq 'db.version()' 2>/dev/null)"
+  printf "%-*s %-10s\\n" "$MAX" 'server' "$VERSION"
+}
+
+function packages_version()
+{
+  local VERSION
+
+  for SUFFIX in server tools mongosh
+  do
+
+    if [[ "$SUFFIX" =~ (server|tools) ]]
+    then
+      PREFIX='percona-server'
+    else
+      PREFIX='percona'
+    fi
+
+    PACKAGE="$PREFIX-mongodb-$SUFFIX"
+
+    VERSION="$(dpkg -s "$PACKAGE" 2>/dev/null | grep -E '^Version:')"
+    VERSION="${VERSION##*:}"
+    VERSION="${VERSION#* }"
+    printf "%-*s %-10s\\n" "$MAX" "$PACKAGE" "$VERSION"
+
+  done
+}
+
+function tools_version()
+{
+  local VERSION
+
+  for SUFFIX in sh export import
+  do
+
+    TOOL="mongo$SUFFIX"
+
+    if ! command -v "$TOOL" >/dev/null 2>/dev/null
+    then
+      continue
+    fi
+
+    INFO="$(bash -c "$TOOL --version")"
+    GIT="$(echo "$INFO" | grep 'git version:')"
+    read -r VERSION <<< "$INFO"
+    GIT="${GIT##*:}"
+    GIT="${GIT#* }"
+    VERSION="${VERSION##*:}"
+    VERSION="${VERSION#* }"
+    VERSION="${VERSION%% *}"
+    printf "%-*s %-10s\\n" "$MAX" "$TOOL" "$VERSION $GIT"
+
+  done
+}
+
+function host_info()
+{
+  echo "$HOSTNAME"
+}
+
+function server_info()
+{
+  for VAR in DB_HOST DB_PORT DB_NAME
+  do
+    printf "%-*s %-10s\\n" "$MAX" "$VAR" "${!VAR}"
+  done
+}
+
+function main()
+{
+  defaults
+  cfg_load
+  host_info
+  server_info
+  server_version
+  tools_version
+  packages_version
+}
+
+main "$@" | sort -bVk2
