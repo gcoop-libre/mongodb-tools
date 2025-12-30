@@ -131,6 +131,7 @@ cfg_load ()
   local CNF
 
   [[ -z "$DB_CONF" ]] && return
+  [[ -s "$DB_CONF" ]] || die "EMPTY OR NOT FOUND DB_CONF=$DB_CONF"
 
   while read -r LINE
   do
