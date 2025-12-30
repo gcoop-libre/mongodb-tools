@@ -130,7 +130,7 @@ cfg_load ()
 {
   local CNF
 
-  [[ -s "$DB_CONF" ]] || return
+  [[ -z "$DB_CONF" ]] && return
 
   while read -r LINE
   do
