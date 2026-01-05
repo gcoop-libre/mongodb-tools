@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2025 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2025 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+function temporal()
+{
+  COLS="$(mktemp)"
+}
+
+function clean()
+{
+  [[ "$BASH_DEBUG" -eq 1 ]] || rm -f "$COLS"
+}
+
+function require()
+{
+  if ! command -v mngq 2>/dev/null >/dev/null
+  then
+    die "NOT FOUND mngq"
+  fi
+}
+
+function defaults()
+{
+  [[ -n "$DB_CONF" ]] || DB_CONF='.mng'
+}
+
+function params()
+{
+  [[ -n "$COL" ]] || COL="$1"
+  [[ -n "$KEY" ]] || KEY="$2"
+  [[ -n "$VAL" ]] || VAL="$3"
+}
+
+function cols2total()
+{
+  if [[ -z "$COL" ]]
+  then
+    DB_CONF="$DB_CONF" mngq 2>/dev/null > "$COLS"
+  else
+    if [[ "$COL" =~ \* ]]
+    then
+      DB_CONF="$DB_CONF" mngq 2>/dev/null | grep -E "${COL//[*]/}" > "$COLS"
+      TOT="$(wc -l < "$COLS")"
+      [[ "$TOT" -gt 0 ]] && stderror "FOUND $TOT COLLECTIONS MATCH WITH $COL"
+    else
+      DB_CONF="$DB_CONF" mngq 2>/dev/null | grep -E "^$COL$" > "$COLS"
+    fi
+  fi
+
+  TOT="$(wc -l < "$COLS")"
+  [[ "$TOT" -eq 0 ]] && die "NOT FOUND COLLECTIONS $COL"
+
+  SUM=0
+  while read -r COL
+  do
+
+    OPT="{$KEY: '$VAL'}"
+    [[ -z "$VAL" ]] && OPT=''
+
+    TOT="$(DB_CONF="$DB_CONF" mngq "db[\"$COL\"].countDocuments($OPT)" 2>/dev/null)"
+    SUM="$((SUM+TOT))"
+
+    printf "%10d %s\\n" "$TOT" "$COL"
+
+  done < "$COLS"
+
+  printf "%10d %s\\n" "$SUM" 'total'
+}
+
+function main()
+{
+  require
+  temporal
+  defaults
+  params "$@"
+  cols2total
+  clean
+}
+
+main "$@"
