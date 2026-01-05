@@ -50,7 +50,8 @@ function require()
 
 function defaults()
 {
-  [[ -n "$DB_CONF" ]] || DB_CONF='.mng'
+  [[ -n "$DB_CONF"    ]] || DB_CONF='.mng'
+  [[ -n "$ONLY_TOTAL" ]] || ONLY_TOTAL=0
 }
 
 function params()
@@ -89,11 +90,16 @@ function cols2total()
     TOT="$(DB_CONF="$DB_CONF" mngq "db[\"$COL\"].countDocuments($OPT)" 2>/dev/null)"
     SUM="$((SUM+TOT))"
 
-    printf "%10d %s\\n" "$TOT" "$COL"
+    [[ "$ONLY_TOTAL" -eq 0 ]] && printf "%10d %s\\n" "$TOT" "$COL"
 
   done < "$COLS"
 
-  printf "%10d %s\\n" "$SUM" 'total'
+  if [[ "$ONLY_TOTAL" -eq 1 ]]
+  then
+    printf "%0d\\n" "$SUM"
+  else
+    printf "%10d %s\\n" "$SUM" 'total'
+  fi
 }
 
 function main()
