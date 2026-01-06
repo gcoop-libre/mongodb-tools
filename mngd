@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2026 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2026 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+function req()
+{
+  if ! command -v "$1" >/dev/null 2>/dev/null
+  then
+    die "NOT FOUND $1, TRY INSTALL"
+  fi
+}
+
+function defaults()
+{
+  [[ -n "$WAITSEC" ]] || WAITSEC=5
+  [[ -n "$DB_CONF" ]] || DB_CONF='.mng'
+}
+
+function params()
+{
+  [[ -n "$COL"  ]] || COL="$1"
+  [[ -z "$COL"  ]] && die "EMPTY COLLECTION"
+}
+
+function delete()
+{
+  stderror "DELETE ALL DOCUMENTS IN COLLECTION $1 (CONTROL+C TO ABORT) ..."
+  sleep "$WAITSEC"
+  DB_CONF="$DB_CONF" mngq "db[\"$1\"].deleteMany({})"
+}
+
+function count()
+{
+  DB_CONF="$DB_CONF" mngq "db[\"$1\"].estimatedDocumentCount()" 2>/dev/null
+}
+
+function exists()
+{
+  local OK
+  OK="$(DB_CONFG="$DB_CONF" mngq QRY="print(db[\"$1\"].findOne() ? 1 : 0)" 2>/dev/null || exit 1)"
+  return "$((OK ^ 1))"
+}
+
+function main()
+{
+  req mngq
+  defaults
+  params "$@"
+  if exists "$COL"
+  then
+    TOT="$(count "$COL")"
+    if [[ "$TOT" -ne 0 ]]
+    then
+      stderror "DELETE $TOT ESTIMATED DOCUMENTS IN $COL (CONTROL+C TO ABORT) ..."
+      sleep "$WAITSEC"
+    fi
+  fi
+  delete "$COL"
+}
+
+main "$@"
