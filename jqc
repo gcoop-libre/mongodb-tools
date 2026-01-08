@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2026 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2026 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+[[ -n "$FILE" ]] || FILE="$1"
+
+TOT="$(wc -l < "$FILE")"
+OBJ="$(jq -c . "$FILE" 2>/dev/null | wc -l)"
+
+if [[ "$TOT" -gt 0 && "$OBJ" -eq "$TOT" ]]
+then
+  echo "$TOT"
+  stderror "$FILE IS JSONL"
+elif jq -e . "$FILE" >/dev/null 2>&1
+then
+  echo "$OBJ"
+  stderror "$FILE IS JSON"
+else
+  die "$FILE INVALID JSON OR JSONL WITH $TOT LINES"
+fi
