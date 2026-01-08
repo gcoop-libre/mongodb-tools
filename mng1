@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2025 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2025 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+function temporal()
+{
+  ERROR="$(mktemp)"
+  JSON="$(mktemp)"
+}
+
+function clean()
+{
+  [[ "$BASH_DEBUG" -eq 1 ]] && return
+  rm -f "$ERROR" "$JSON"
+}
+
+function require()
+{
+  if ! command -v mngq 2>/dev/null >/dev/null
+  then
+    die "NOT FOUND mngq"
+  fi
+}
+
+function defaults()
+{
+  [[ -n "$DB_CONF"    ]] || DB_CONF='.mng'
+  [[ -n "$JQ"         ]] || JQ='.'
+  [[ -n "$JQ_OPTS"    ]] || JQ_OPTS='-r'
+}
+
+function params()
+{
+  [[ -n "$COL" ]] || COL="$1"
+  [[ -z "$COL" ]] && die "EMPTY COLLECTION"
+  [[ -n "$KEY" ]] || KEY="$2"
+  [[ -n "$VAL" ]] || VAL="$3"
+}
+
+function one()
+{
+  local MNG QRY
+
+  QRY=''
+  [[ -z "$KEY" ]] || QRY="{ $KEY: "
+  [[ -z "$VAL" ]] || QRY+="\"$VAL\" }"
+  [[ -z "$VAL" ]] && QRY=''
+
+  MNG="JSON.stringify(db[\"$COL\"].findOne($QRY))"
+
+  DB_CONF="$DB_CONF" mngq "$MNG" >"$JSON" 2>"$ERROR" \
+    || die "ERROR: $(cat "$ERROR")"
+
+  [[ -s "$JSON" ]] || die "EMPTY JSON OUTPUT $JSON"
+  if command -v jq >/dev/null 2>/dev/null
+  then
+    bash -c "jq $JQ_OPTS $JQ $JSON"
+  else
+    cat "$JSON"
+  fi
+}
+
+function main()
+{
+  require
+  temporal
+  defaults
+  params "$@"
+  one
+  clean
+}
+
+main "$@"
