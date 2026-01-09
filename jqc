@@ -30,19 +30,80 @@ function die()
   exit 1
 }
 
-[[ -n "$FILE" ]] || FILE="$1"
+function temporal()
+{
+  TMPI="$(mktemp)"
+}
 
-TOT="$(wc -l < "$FILE")"
-OBJ="$(jq -c . "$FILE" 2>/dev/null | wc -l)"
+function clean()
+{
+  rm -f "$TMPI"
+}
 
-if [[ "$TOT" -gt 0 && "$OBJ" -eq "$TOT" ]]
-then
-  echo "$TOT"
-  stderror "$FILE IS JSONL"
-elif jq -e . "$FILE" >/dev/null 2>&1
-then
-  echo "$OBJ"
-  stderror "$FILE IS JSON"
-else
-  die "$FILE INVALID JSON OR JSONL WITH $TOT LINES"
-fi
+function read_piped_input()
+{
+  while IFS= read -r PIPED_INPUT
+  do
+      echo "$PIPED_INPUT" >> "$TMPI"
+  done
+}
+
+function defaults()
+{
+  [[ -n "$MAX" ]] || MAX='10'
+}
+
+function params()
+{
+  if [[ -z "$1" ]]
+  then
+    if [[ -t 0 ]]
+    then
+      if [[ -n "$FILE" ]]
+      then
+        echo "$FILE" > "$TMPI"
+      fi
+    else
+      read_piped_input
+    fi
+  else
+    echo "$*" | tr ' ' '\n' > "$TMPI"
+  fi
+
+  [[ -s "$TMPI" ]] || die "EMPTY INPUT"
+}
+
+function count()
+{
+  while read -r FILE _
+  do
+
+    [[ -s "$FILE" ]] || die "EMPTY OR NOT FOUND FILE $FILE"
+
+    WCL="$(wc -l < "$FILE")"
+    JQC="$(jq -Mc '.' "$FILE" | wc -l)"
+    LEN="$(jq -Mc '. | length' "$FILE")"
+
+    if [[ "$JQC" -eq "$WCL" ]]
+    then
+      TYP='jsonl'
+      TOT="$WCL"
+    else
+      TYP='json'
+      TOT="$LEN"
+    fi
+
+    printf "%*s %-5s %s\\n" "$MAX" "$TOT" "$TYP" "$FILE"
+
+  done < "$TMPI"
+}
+
+function main()
+{
+  temporal
+  defaults
+  params "$@"
+  count
+}
+
+main "$@"
