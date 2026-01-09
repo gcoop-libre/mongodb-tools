@@ -50,7 +50,8 @@ function read_piped_input()
 
 function defaults()
 {
-  [[ -n "$MAX" ]] || MAX='10'
+  [[ -n "$MAX"        ]] || MAX='10'
+  [[ -n "$ONLY_TOTAL" ]] || ONLY_TOTAL=0
 }
 
 function params()
@@ -93,7 +94,12 @@ function count()
       TOT="$LEN"
     fi
 
-    printf "%*s %-5s %s\\n" "$MAX" "$TOT" "$TYP" "$FILE"
+    if [[ "$ONLY_TOTAL" ]]
+    then
+      echo "$TOT"
+    else
+      printf "%*s %-5s %s\\n" "$MAX" "$TOT" "$TYP" "$FILE"
+    fi
 
   done < "$TMPI"
 }
