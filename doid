@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+
+# This script comes with ABSOLUTELY NO WARRANTY, use at own risk
+# Copyright (C) 2026 Osiris Alejandro Gomez <osiux@osiux.com>
+# Copyright (C) 2026 Osiris Alejandro Gomez <osiris@gcoop.coop>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+[[ "$BASH_DEBUG" -eq 1 ]] && set -x
+
+BIN="$(basename "$0")"
+
+function usage()
+{
+cat << EOF
+
+## \`$BIN\` Convert _MongoDB_ _ObjectId_ to date in \`ISO8601\` format
+
+### Usage
+
+~~~bash
+
+$BIN OBJECT_ID
+
+~~~
+
+### Examples
+
+~~~bash
+
+$BIN
+69967cb00000000000000000
+
+$BIN 2026-02-19
+69967cb00000000000000000
+
+echo 2026-02-19 | $BIN
+69967cb00000000000000000
+
+$BIN <<< 2026-02-19
+69967cb00000000000000000
+
+DATE=2026-02-19 $BIN
+69967cb00000000000000000
+
+echo 2026-01-01 > oids
+echo 2026-02-19 >>oids
+
+cat oids | $BIN
+6955e3300000000000000000
+69967cb00000000000000000
+
+$BIN < oids
+6955e3300000000000000000
+69967cb00000000000000000
+
+~~~
+
+EOF
+exit 0
+}
+
+[[ "$1" =~ ^[-]+(h|help) ]] && usage
+
+function stderror()
+{
+  echo >&2 "$1"
+}
+
+function die()
+{
+  stderror "$1"
+  exit 1
+}
+
+function read_piped_input()
+{
+  while IFS= read -r PIPED_INPUT
+  do
+    echo "$PIPED_INPUT" >> "$TMPI"
+  done
+}
+
+function defaults()
+{
+  [[ -n "$DATE" ]] || DATE="$(date +'%F')"
+}
+
+function temporal()
+{
+  TMPI="$(mktemp)"
+}
+
+function clean()
+{
+  [[ "$BASH_DEBUG" -eq 1 ]] && return
+  rm -f "$TMPI"
+}
+
+function params()
+{
+  if [[ -z "$1" ]]
+  then
+    if [[ -t 0 ]]
+    then
+      if [[ -n "$DATE" ]]
+      then
+        echo "$DATE" >"$TMPI"
+      else
+        die "EMPTY DATE"
+      fi
+    else
+      read_piped_input
+    fi
+  else
+    if [[ -s "$1" ]]
+    then
+      cp -f "$1"  "$TMPI"
+    else
+      echo  "$1" >"$TMPI"
+    fi
+  fi
+}
+
+function date_to_oid()
+{
+  local EPOCH HEX OID
+
+  [[ "$1" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || die "INVALID DATE $1"
+
+  EPOCH="$(date -d "$1" +%s)"
+  printf -v HEX '%08x' "$EPOCH"
+
+  # ObjectId = 24 hexadecimal characters
+  # First 8: timestamp, next 16: machine + pid + counter
+  # For min: timestamp + 16 zeros
+  # For max: timestamp - 1 (of the next day) + ffffffffffffffff
+
+  OID="${HEX}0000000000000000"
+  [[ "${#OID}" -eq 24 ]] || die "ERROR OID $OID"
+
+  printf "%24s" "$OID"
+}
+
+function dates_to_oids()
+{
+  while read -r DATE EXTRA
+  do
+
+    OID="$(date_to_oid "$DATE")"
+
+    if [[ -z "$EXTRA" ]]
+    then
+      printf "%s\\n" "$OID"
+    else
+      printf "%s %s\\n" "$OID" "$EXTRA"
+    fi
+
+  done < "$TMPI"
+}
+
+function main()
+{
+  temporal
+  defaults
+  params "$@"
+  dates_to_oids
+  clean
+}
+
+main "$@"
